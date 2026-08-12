@@ -14,7 +14,7 @@ export async function GET(
     return NextResponse.json({ error: "Badge not found." }, { status: 404 });
   }
 
-  return new NextResponse(image, {
+  return new NextResponse(new Uint8Array(image), {
     headers: {
       "Content-Type": "image/png",
       "Cache-Control": "public, max-age=60",
