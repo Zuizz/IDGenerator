@@ -2,9 +2,15 @@
  * Canvas utility functions for drawing the ID badge.
  */
 
+export interface PhotoTransform {
+  zoom: number;    // default 1.0 (range 0.8 to 2.5)
+  offsetX: number; // % offset (-50 to 50)
+  offsetY: number; // % offset (-50 to 50)
+}
+
 /**
- * Draws an image onto the canvas with an object-fit: cover effect.
- * The image is center-cropped to fill the target rectangle without stretching.
+ * Draws an image onto the canvas with smart face-biased cover effect & zoom/pan controls.
+ * The image is face-cropped to fill the target rectangle without stretching.
  */
 export function drawCoverImage(
   ctx: CanvasRenderingContext2D,
@@ -12,26 +18,40 @@ export function drawCoverImage(
   x: number,
   y: number,
   w: number,
-  h: number
+  h: number,
+  transform: PhotoTransform = { zoom: 1, offsetX: 0, offsetY: 0 }
 ): void {
+  const zoom = Math.max(0.5, transform.zoom || 1);
   const imgAspect = img.naturalWidth / img.naturalHeight;
   const boxAspect = w / h;
 
-  let sx: number, sy: number, sw: number, sh: number;
+  let sw: number, sh: number;
 
   if (imgAspect > boxAspect) {
-    // Image is wider than box — crop sides
-    sh = img.naturalHeight;
+    // Image is wider than box
+    sh = img.naturalHeight / zoom;
     sw = sh * boxAspect;
-    sx = (img.naturalWidth - sw) / 2;
-    sy = 0;
   } else {
-    // Image is taller than box — crop top/bottom
-    sw = img.naturalWidth;
+    // Image is taller than box
+    sw = img.naturalWidth / zoom;
     sh = sw / boxAspect;
-    sx = 0;
-    sy = (img.naturalHeight - sh) / 2;
   }
+
+  // Smart Face Bias: For portrait photos, default to top 25% bias (where faces reside)
+  const defaultYBias = imgAspect < 0.95 ? 0.25 : 0.5;
+
+  const maxSx = Math.max(0, img.naturalWidth - sw);
+  const maxSy = Math.max(0, img.naturalHeight - sh);
+
+  const baseSx = maxSx * 0.5;
+  const baseSy = maxSy * defaultYBias;
+
+  // Apply user offsets (-50 to +50 range)
+  const userSx = baseSx + (transform.offsetX / 100) * (img.naturalWidth / 2);
+  const userSy = baseSy + (transform.offsetY / 100) * (img.naturalHeight / 2);
+
+  const sx = Math.max(0, Math.min(maxSx, userSx));
+  const sy = Math.max(0, Math.min(maxSy, userSy));
 
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
