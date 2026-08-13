@@ -5,7 +5,11 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { dataUrl?: string };
+    const body = (await request.json()) as {
+      dataUrl?: string;
+      name?: string;
+      stack?: string;
+    };
 
     if (!body.dataUrl) {
       return NextResponse.json(
@@ -14,7 +18,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const { id } = await storeShareBadge(body.dataUrl);
+    const { id } = await storeShareBadge(body.dataUrl, {
+      name: body.name,
+      stack: body.stack,
+    });
     return NextResponse.json({ id });
   } catch (error) {
     console.error("Failed to store badge:", error);

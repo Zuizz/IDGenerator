@@ -3,8 +3,13 @@ import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
 
-// Primary in-memory cache for ultra-fast serverless access within warm instances
+interface BadgeMetadata {
+  name?: string;
+  stack?: string;
+}
+
 const memoryCache = new Map<string, Buffer>();
+const metaCache = new Map<string, BadgeMetadata>();
 const SHARE_DIR = path.join(os.tmpdir(), "hh-goa-share-cache");
 
 function dataUrlToBuffer(dataUrl: string): Buffer {
@@ -16,15 +21,23 @@ function dataUrlToBuffer(dataUrl: string): Buffer {
   return Buffer.from(match[2], "base64");
 }
 
-export async function storeShareBadge(dataUrl: string): Promise<{ id: string }> {
+export async function storeShareBadge(
+  dataUrl: string,
+  meta?: BadgeMetadata
+): Promise<{ id: string }> {
   const id = crypto.randomUUID();
   const buffer = dataUrlToBuffer(dataUrl);
 
   // 1. Store in memory cache
   memoryCache.set(id, buffer);
+  if (meta) metaCache.set(id, meta);
+
   if (memoryCache.size > 200) {
     const firstKey = memoryCache.keys().next().value;
-    if (firstKey) memoryCache.delete(firstKey);
+    if (firstKey) {
+      memoryCache.delete(firstKey);
+      metaCache.delete(firstKey);
+    }
   }
 
   // 2. Attempt Vercel Blob if token is available
@@ -45,11 +58,31 @@ export async function storeShareBadge(dataUrl: string): Promise<{ id: string }> 
     await mkdir(SHARE_DIR, { recursive: true });
     const filePath = path.join(SHARE_DIR, `${id}.png`);
     await writeFile(filePath, buffer);
+
+    if (meta) {
+      const metaPath = path.join(SHARE_DIR, `${id}.json`);
+      await writeFile(metaPath, JSON.stringify(meta));
+    }
   } catch (fsErr) {
     console.warn("Temp FS write warning:", fsErr);
   }
 
   return { id };
+}
+
+export async function readShareMetadata(id: string): Promise<BadgeMetadata | null> {
+  if (metaCache.has(id)) {
+    return metaCache.get(id)!;
+  }
+  try {
+    const metaPath = path.join(SHARE_DIR, `${id}.json`);
+    const content = await readFile(metaPath, "utf-8");
+    const meta = JSON.parse(content) as BadgeMetadata;
+    metaCache.set(id, meta);
+    return meta;
+  } catch {
+    return null;
+  }
 }
 
 export async function readShareBadge(id: string): Promise<Buffer | null> {

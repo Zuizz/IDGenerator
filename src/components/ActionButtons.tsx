@@ -5,6 +5,8 @@ import React, { useState } from "react";
 interface ActionButtonsProps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   isFormValid: boolean;
+  name?: string;
+  stack?: string;
 }
 
 const CAPTION = "Just got my Hacker House Goa 2026 Builder ID 🌴 #FrameInGoa";
@@ -12,6 +14,8 @@ const CAPTION = "Just got my Hacker House Goa 2026 Builder ID 🌴 #FrameInGoa";
 export default function ActionButtons({
   canvasRef,
   isFormValid,
+  name,
+  stack,
 }: ActionButtonsProps) {
   const [isSharing, setIsSharing] = useState(false);
 
@@ -49,16 +53,20 @@ export default function ActionButtons({
         const response = await fetch("/api/shares", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dataUrl }),
+          body: JSON.stringify({ dataUrl, name, stack }),
         });
         if (response.ok) {
           const { id } = (await response.json()) as { id: string };
-          // Use NEXT_PUBLIC_SITE_URL on server, window.location.origin on client
           const siteUrl =
             process.env.NEXT_PUBLIC_SITE_URL ||
             window.location.origin;
-          const shareUrl = `${siteUrl}/share/${id}`;
-          // Append the personalised badge link — X renders it as a card preview
+          
+          const params = new URLSearchParams();
+          if (name) params.set("name", name);
+          if (stack) params.set("stack", stack);
+          const queryString = params.toString() ? `?${params.toString()}` : "";
+
+          const shareUrl = `${siteUrl}/share/${id}${queryString}`;
           tweetText = `${CAPTION}\n${shareUrl}`;
         }
       } catch {

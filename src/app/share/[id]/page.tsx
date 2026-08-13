@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { readShareMetadata } from "@/lib/shareStore";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -13,23 +14,35 @@ function getSharePageUrl(id: string): string {
 
 interface SharePageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ name?: string; stack?: string }>;
 }
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: SharePageProps): Promise<Metadata> {
   const { id } = await params;
+  const sParams = (await searchParams) || {};
+  const meta = await readShareMetadata(id);
+
+  const name = meta?.name || sParams.name;
   const imageUrl = getBadgeImageUrl(id);
   const pageUrl = getSharePageUrl(id);
 
+  const titleText = name
+    ? `${name}'s Builder Badge | Hacker House Goa 2026`
+    : "Hacker House Goa 2026 Builder Badge";
+
+  const descText = name
+    ? `${name} just created their official builder badge for Hacker House Goa 2026. Check it out!`
+    : "I just created my builder badge for Hacker House Goa 2026. Check out the badge preview and make your own!";
+
   return {
-    title: "My Hacker House Goa 2026 Badge",
-    description:
-      "I just created my builder badge for Hacker House Goa 2026. Check out the badge preview and make your own!",
+    title: titleText,
+    description: descText,
     openGraph: {
-      title: "My Hacker House Goa 2026 Badge 🌴 #FrameInGoa",
-      description:
-        "I just created my builder badge for Hacker House Goa 2026. Check out the badge preview and make your own!",
+      title: titleText,
+      description: descText,
       type: "website",
       url: pageUrl,
       images: [
@@ -37,29 +50,34 @@ export async function generateMetadata({
           url: imageUrl,
           width: 600,
           height: 900,
-          alt: "Hacker House Goa 2026 Builder Badge",
+          alt: titleText,
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: "My Hacker House Goa 2026 Badge 🌴 #FrameInGoa",
-      description:
-        "I just created my builder badge for Hacker House Goa 2026. Check out the badge preview and make your own!",
+      title: titleText,
+      description: descText,
       images: [imageUrl],
     },
   };
 }
 
-export default async function SharePage({ params }: SharePageProps) {
+export default async function SharePage({ params, searchParams }: SharePageProps) {
   const { id } = await params;
+  const sParams = (await searchParams) || {};
+  const meta = await readShareMetadata(id);
+
+  const name = meta?.name || sParams.name;
+  const stack = meta?.stack || sParams.stack;
+
   const imageUrl = getBadgeImageUrl(id);
   const pageUrl = getSharePageUrl(id);
 
-  // Pre-filled tweet: the share URL is embedded in the text so X renders
-  // the link card (OG image = the actual generated badge) inside the post.
   const tweetText = encodeURIComponent(
-    `Just got my Hacker House Goa 2026 Builder ID 🌴 #FrameInGoa\n${pageUrl}`
+    name
+      ? `Just got my Hacker House Goa 2026 Builder ID (${name}) 🌴 #FrameInGoa\n${pageUrl}`
+      : `Just got my Hacker House Goa 2026 Builder ID 🌴 #FrameInGoa\n${pageUrl}`
   );
   const xShareUrl = `https://x.com/intent/tweet?text=${tweetText}`;
 
@@ -76,7 +94,7 @@ export default async function SharePage({ params }: SharePageProps) {
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-hh-yellow/10 border border-hh-yellow/20 mb-6">
           <span className="w-2 h-2 rounded-full bg-hh-yellow animate-pulse" />
           <span className="text-hh-yellow text-xs font-medium tracking-wider uppercase">
-            Builder Badge
+            {name ? `${name}'s Builder Badge` : "Builder Badge"}
           </span>
         </div>
 
@@ -86,21 +104,38 @@ export default async function SharePage({ params }: SharePageProps) {
           <span className="text-white">2026</span>
         </h1>
         <p className="text-white/50 text-sm mb-8">
-          Someone just created their builder badge.
+          {name
+            ? `${name} created their builder badge for Hacker House Goa 2026.`
+            : "Someone just created their builder badge."}
         </p>
 
-        {/* Badge image */}
-        <div className="mb-8">
+        {/* Badge image with metadata overlay fallback */}
+        <div className="mb-8 relative max-w-sm mx-auto rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
           <img
             src={imageUrl}
-            alt="Hacker House Goa 2026 Builder Badge"
-            className="w-full max-w-sm mx-auto rounded-2xl shadow-2xl ring-1 ring-white/10"
+            alt={name ? `${name}'s Builder Badge` : "Hacker House Goa 2026 Builder Badge"}
+            className="w-full h-auto block"
           />
+
+          {/* Fallback Overlay: Displays name and stack over the badge template if image is template */}
+          {(name || stack) && (
+            <div className="absolute inset-0 pointer-events-none flex flex-col justify-end pb-[26%] items-center px-6 text-center">
+              {name && (
+                <div className="text-white font-serif font-bold text-xl sm:text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-wide uppercase mb-1.5">
+                  {name}
+                </div>
+              )}
+              {stack && (
+                <div className="inline-block px-3 py-1 rounded-full bg-[#0b6839]/90 border border-[#FFD700] text-[#FFE766] text-[10px] sm:text-xs font-bold font-mono tracking-wider shadow-md uppercase">
+                  PRIMARY STACK: {stack}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action buttons */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          {/* Share to X — opens pre-filled tweet with caption + share URL */}
           <a
             href={xShareUrl}
             target="_blank"
@@ -121,7 +156,6 @@ export default async function SharePage({ params }: SharePageProps) {
             Share to X
           </a>
 
-          {/* Create your own badge */}
           <Link
             href="/"
             id="create-badge-btn"
