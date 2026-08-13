@@ -7,40 +7,35 @@ interface ActionButtonsProps {
   isFormValid: boolean;
 }
 
+const CAPTION = "Just got my Hacker House Goa 2026 Builder ID 🌴 #FrameInGoa";
+
 export default function ActionButtons({
   canvasRef,
   isFormValid,
 }: ActionButtonsProps) {
   const [isSharing, setIsSharing] = useState(false);
-  const [shareError, setShareError] = useState<string | null>(null);
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const dataUrl = canvas.toDataURL("image/png");
     const link = document.createElement("a");
     link.download = "hh-goa-2026-badge.png";
-    link.href = dataUrl;
+    link.href = canvas.toDataURL("image/png");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const handleShareToX = async () => {
+  const handleShareToX = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     setIsSharing(true);
-    setShareError(null);
-
-    const CAPTION =
-      "Just got my Hacker House Goa 2026 Builder ID 🌴 #FrameInGoa";
 
     try {
       const dataUrl = canvas.toDataURL("image/png");
 
-      // 1. Download the badge PNG to user's device so it's ready to attach in X
+      // Step 1: Download badge immediately so user can attach it in X composer
       const link = document.createElement("a");
       link.download = "hh-goa-2026-badge.png";
       link.href = dataUrl;
@@ -48,37 +43,23 @@ export default function ActionButtons({
       link.click();
       document.body.removeChild(link);
 
-      // 2. Best-effort upload to server to generate share page link
-      let sharePageUrl = "";
-      try {
-        const response = await fetch("/api/shares", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dataUrl }),
-        });
-        if (response.ok) {
-          const { id } = (await response.json()) as { id: string };
-          const siteUrl =
-            process.env.NEXT_PUBLIC_SITE_URL ||
-            (typeof window !== "undefined" ? window.location.origin : "");
-          sharePageUrl = `${siteUrl}/share/${id}`;
-        }
-      } catch (e) {
-        console.warn("Share API upload skipped:", e);
-      }
-
-      // 3. Open X compose window directly with caption + optional share link
-      const tweetText = sharePageUrl ? `${CAPTION}\n${sharePageUrl}` : CAPTION;
-      const xIntentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-
+      // Step 2: Open X tweet composer immediately — no waiting on any API
+      const xIntentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(CAPTION)}`;
       const popup = window.open(
         xIntentUrl,
         "share-to-x",
         "width=600,height=600,noopener,noreferrer"
       );
       if (!popup) window.location.href = xIntentUrl;
-    } catch (err) {
-      console.error("Share error:", err);
+
+      // Step 3: Fire-and-forget upload to server in background (for share link)
+      // This NEVER blocks or errors out the share flow above.
+      fetch("/api/shares", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl }),
+      }).catch(() => {/* silently ignore */});
+
     } finally {
       setIsSharing(false);
     }
@@ -133,27 +114,12 @@ export default function ActionButtons({
             }
           `}
         >
-          {isSharing ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Uploading...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-              Share to X
-            </>
-          )}
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+          Share to X
         </button>
       </div>
-
-      {shareError && (
-        <p className="text-hh-pink text-sm text-center animate-fade-in-up">
-          {shareError}
-        </p>
-      )}
     </div>
   );
 }
