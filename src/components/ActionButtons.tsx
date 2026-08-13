@@ -40,27 +40,7 @@ export default function ActionButtons({
     try {
       const dataUrl = canvas.toDataURL("image/png");
 
-      // 1. Upload badge to server to get a stable share URL.
-      const response = await fetch("/api/shares", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl }),
-      });
-
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || "Failed to save badge");
-      }
-
-      const { id } = (await response.json()) as { id: string };
-
-      const siteUrl =
-        process.env.NEXT_PUBLIC_SITE_URL ||
-        (typeof window !== "undefined" ? window.location.origin : "");
-      const sharePageUrl = `${siteUrl}/share/${id}`;
-
-      // 2. Also silently download the badge PNG so the user can attach it
-      //    manually inside X's composer with the image button (📷).
+      // 1. Download the badge PNG to user's device so it's ready to attach in X
       const link = document.createElement("a");
       link.download = "hh-goa-2026-badge.png";
       link.href = dataUrl;
@@ -68,10 +48,27 @@ export default function ActionButtons({
       link.click();
       document.body.removeChild(link);
 
-      // 3. Open X compose window directly — pre-filled caption + link.
-      //    The link's OG image (set on the /share/[id] page) is the generated
-      //    badge, so when deployed the link card shows the actual graphic.
-      const tweetText = `${CAPTION}\n${sharePageUrl}`;
+      // 2. Best-effort upload to server to generate share page link
+      let sharePageUrl = "";
+      try {
+        const response = await fetch("/api/shares", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dataUrl }),
+        });
+        if (response.ok) {
+          const { id } = (await response.json()) as { id: string };
+          const siteUrl =
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            (typeof window !== "undefined" ? window.location.origin : "");
+          sharePageUrl = `${siteUrl}/share/${id}`;
+        }
+      } catch (e) {
+        console.warn("Share API upload skipped:", e);
+      }
+
+      // 3. Open X compose window directly with caption + optional share link
+      const tweetText = sharePageUrl ? `${CAPTION}\n${sharePageUrl}` : CAPTION;
       const xIntentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
 
       const popup = window.open(
@@ -79,15 +76,9 @@ export default function ActionButtons({
         "share-to-x",
         "width=600,height=600,noopener,noreferrer"
       );
-      // Fallback if popups are blocked.
       if (!popup) window.location.href = xIntentUrl;
     } catch (err) {
-      console.error("Share failed:", err);
-      setShareError(
-        err instanceof Error
-          ? err.message
-          : "Failed to share badge. Please try again."
-      );
+      console.error("Share error:", err);
     } finally {
       setIsSharing(false);
     }
