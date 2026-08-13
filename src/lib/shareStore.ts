@@ -1,4 +1,4 @@
-﻿import { mkdir, writeFile, readFile, access } from "node:fs/promises";
+import { mkdir, writeFile, readFile, access } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
@@ -14,7 +14,7 @@ interface BadgeMetadata {
 const memoryCache = new Map<string, Buffer>();
 const metaCache = new Map<string, BadgeMetadata>();
 const SHARE_DIR = path.join(os.tmpdir(), "hh-goa-share-cache");
-const BUCKET = "badges";
+const BUCKET = "ID";
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
