@@ -1,8 +1,9 @@
 import { mkdir, writeFile, readFile, access } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import os from "node:os";
 
-const SHARE_DIR = path.join(process.cwd(), ".share-cache");
+const SHARE_DIR = path.join(os.tmpdir(), "hh-goa-share-cache");
 
 function dataUrlToBuffer(dataUrl: string): Buffer {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);

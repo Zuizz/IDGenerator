@@ -59,8 +59,8 @@ export default function CanvasPreview({
   // Load both templates on mount
   useEffect(() => {
       Promise.all([
-        loadImage("/badge-template.png"),
-        loadImage("/pfp-template.png"),
+        loadImage("/badge-template.png?v=2"),
+        loadImage("/pfp-template.png?v=2"),
       ])
       .then(([cardImg, pfpImg]) => {
         cardTemplateRef.current = cardImg;
