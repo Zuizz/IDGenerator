@@ -109,29 +109,13 @@ export default async function SharePage({ params, searchParams }: SharePageProps
             : "Someone just created their builder badge."}
         </p>
 
-        {/* Badge image with metadata overlay fallback */}
+        {/* Badge image */}
         <div className="mb-8 relative max-w-sm mx-auto rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
           <img
             src={imageUrl}
             alt={name ? `${name}'s Builder Badge` : "Hacker House Goa 2026 Builder Badge"}
             className="w-full h-auto block"
           />
-
-          {/* Fallback Overlay: Displays name and stack over the badge template if image is template */}
-          {(name || stack) && (
-            <div className="absolute inset-0 pointer-events-none flex flex-col justify-end pb-[26%] items-center px-6 text-center">
-              {name && (
-                <div className="text-white font-serif font-bold text-xl sm:text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-wide uppercase mb-1.5">
-                  {name}
-                </div>
-              )}
-              {stack && (
-                <div className="inline-block px-3 py-1 rounded-full bg-[#0b6839]/90 border border-[#FFD700] text-[#FFE766] text-[10px] sm:text-xs font-bold font-mono tracking-wider shadow-md uppercase">
-                  PRIMARY STACK: {stack}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Action buttons */}
