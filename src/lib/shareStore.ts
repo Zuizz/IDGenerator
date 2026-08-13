@@ -6,6 +6,7 @@ import os from "node:os";
 interface BadgeMetadata {
   name?: string;
   stack?: string;
+  title?: string;
 }
 
 const memoryCache = new Map<string, Buffer>();

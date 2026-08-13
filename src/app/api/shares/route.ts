@@ -9,6 +9,7 @@ export async function POST(request: Request) {
       dataUrl?: string;
       name?: string;
       stack?: string;
+      title?: string;
     };
 
     if (!body.dataUrl) {
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
     const { id } = await storeShareBadge(body.dataUrl, {
       name: body.name,
       stack: body.stack,
+      title: body.title,
     });
     return NextResponse.json({ id });
   } catch (error) {

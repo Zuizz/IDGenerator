@@ -141,11 +141,11 @@ export default function HomePage() {
                 transform={photoTransform}
               />
 
-              <ActionButtons canvasRef={canvasRef} isFormValid={isFormValid} name={name} stack={stack} />
+              <ActionButtons canvasRef={canvasRef} isFormValid={isFormValid} name={name} stack={stack} title={title} />
             </section>
           ) : (
             <section>
-              <ActionButtons canvasRef={canvasRef} isFormValid={isFormValid} name={name} stack={stack} />
+              <ActionButtons canvasRef={canvasRef} isFormValid={isFormValid} name={name} stack={stack} title={title} />
             </section>
           )}
 
@@ -213,7 +213,7 @@ export default function HomePage() {
 
             {/* Action Buttons (Download & Share) */}
             <section>
-              <ActionButtons canvasRef={canvasRef} isFormValid={isFormValid} name={name} stack={stack} />
+              <ActionButtons canvasRef={canvasRef} isFormValid={isFormValid} name={name} stack={stack} title={title} />
             </section>
 
             {/* Footer */}
