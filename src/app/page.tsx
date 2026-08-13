@@ -20,6 +20,7 @@ export default function HomePage() {
   const [showMobilePreview, setShowMobilePreview] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const shareCanvasRef = useRef<HTMLCanvasElement>(null);
   const mobilePreviewRef = useRef<HTMLDivElement>(null);
   const isFormValid = name.trim().length > 0 && stack.trim().length > 0;
 
@@ -145,7 +146,19 @@ export default function HomePage() {
             </section>
           ) : (
             <section>
-              <ActionButtons canvasRef={canvasRef} isFormValid={isFormValid} name={name} stack={stack} title={title} />
+              {/* Hidden canvas kept alive for sharing when mobile preview is hidden */}
+              <div className="absolute -left-[9999px] top-0 w-0 h-0 overflow-hidden" aria-hidden="true">
+                <CanvasPreview
+                  name={name}
+                  stack={stack}
+                  title={title}
+                  photoUrl={photoUrl}
+                  canvasRef={shareCanvasRef}
+                  mode={badgeMode}
+                  transform={photoTransform}
+                />
+              </div>
+              <ActionButtons canvasRef={shareCanvasRef} isFormValid={isFormValid} name={name} stack={stack} title={title} />
             </section>
           )}
 
@@ -156,19 +169,7 @@ export default function HomePage() {
             </p>
           </footer>
 
-          {!showMobilePreview && (
-            <div className="absolute -left-[9999px] top-0 w-0 h-0 overflow-hidden" aria-hidden="true">
-              <CanvasPreview
-                name={name}
-                stack={stack}
-                title={title}
-                photoUrl={photoUrl}
-                canvasRef={canvasRef}
-                mode={badgeMode}
-                transform={photoTransform}
-              />
-            </div>
-          )}
+
         </div>
 
         {/* Desktop Layout */}
