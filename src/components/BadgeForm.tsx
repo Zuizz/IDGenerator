@@ -1,12 +1,17 @@
 "use client";
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { isHeicFile, processImageFile } from "@/lib/heicConverter";
 import { PhotoTransform } from "@/lib/canvasUtils";
+import { fetchAiTitles } from "@/lib/titles";
 
 interface BadgeFormProps {
+  name: string;
+  stack: string;
+  title: string;
   onNameChange: (name: string) => void;
   onStackChange: (stack: string) => void;
+  onTitleChange: (title: string) => void;
   onPhotoChange: (photoUrl: string | null) => void;
   onTransformChange?: (transform: PhotoTransform) => void;
 }
@@ -35,18 +40,25 @@ const STACK_SUGGESTIONS = [
 ];
 
 export default function BadgeForm({
+  name,
+  stack,
+  title,
   onNameChange,
   onStackChange,
+  onTitleChange,
   onPhotoChange,
   onTransformChange,
 }: BadgeFormProps) {
-  const [name, setName] = useState("");
-  const [stack, setStack] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showFineTune, setShowFineTune] = useState(false);
+
+  // AI Title Generation states
+  const [suggestedTitles, setSuggestedTitles] = useState<string[]>([]);
+  const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
+  const prevStackRef = useRef<string>("");
 
   // Photo transform state (smart face alignment)
   const [zoom, setZoom] = useState(1);
@@ -64,22 +76,48 @@ export default function BadgeForm({
   };
 
   const handleNameInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setName(val);
-    onNameChange(val);
+    onNameChange(e.target.value);
   };
+
+  const loadTitlesForStack = useCallback(
+    async (targetStack: string, autoSelect: boolean = false) => {
+      setIsGeneratingTitles(true);
+      try {
+        const titles = await fetchAiTitles(targetStack);
+        setSuggestedTitles(titles);
+        if (titles.length > 0 && (autoSelect || !title)) {
+          onTitleChange(titles[0]);
+        }
+      } finally {
+        setIsGeneratingTitles(false);
+      }
+    },
+    [onTitleChange, title]
+  );
+
+  // Trigger AI title fetch when stack changes
+  useEffect(() => {
+    const trimmedStack = stack.trim();
+    if (trimmedStack && trimmedStack !== prevStackRef.current && trimmedStack.length >= 2) {
+      prevStackRef.current = trimmedStack;
+      loadTitlesForStack(trimmedStack, true);
+    }
+  }, [stack, loadTitlesForStack]);
 
   const handleStackInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setStack(val);
     onStackChange(val);
     setShowSuggestions(val.length > 0);
   };
 
   const selectSuggestion = (suggestion: string) => {
-    setStack(suggestion);
     onStackChange(suggestion);
     setShowSuggestions(false);
+    loadTitlesForStack(suggestion, true);
+  };
+
+  const handleRefreshTitles = () => {
+    loadTitlesForStack(stack || "", true);
   };
 
   const handleFile = useCallback(
@@ -98,7 +136,6 @@ export default function BadgeForm({
         prevObjectUrl.current = url;
         setPhotoPreview(url);
         onPhotoChange(url);
-        // Reset transform to default face-centered alignment
         updateTransform(1, 0, 0);
         setShowFineTune(true);
       } catch (err) {
@@ -171,9 +208,10 @@ export default function BadgeForm({
           className={`
             relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer
             transition-all duration-300 ease-out
-            ${isDragOver
-              ? "border-hh-yellow bg-hh-yellow/10 scale-[1.01]"
-              : photoPreview
+            ${
+              isDragOver
+                ? "border-hh-yellow bg-hh-yellow/10 scale-[1.01]"
+                : photoPreview
                 ? "border-hh-green-600 bg-hh-green-800/40"
                 : "border-hh-green-600 hover:border-hh-yellow/60 hover:bg-hh-green-800/30 animate-border-pulse"
             }
@@ -217,7 +255,10 @@ export default function BadgeForm({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="flex items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   type="button"
                   onClick={() => setShowFineTune(!showFineTune)}
@@ -357,7 +398,7 @@ export default function BadgeForm({
         />
       </div>
 
-      {/* Stack Input */}
+      {/* Primary Stack Input */}
       <div className="relative">
         <label
           htmlFor="stack-input"
@@ -399,6 +440,86 @@ export default function BadgeForm({
             ))}
           </div>
         )}
+      </div>
+
+      {/* AI Builder Title Selection Section */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="title-input"
+            className="flex items-center gap-1.5 text-xs font-semibold text-hh-pink tracking-wider uppercase"
+          >
+            <span>✨ Builder Title (AI Generated)</span>
+          </label>
+          <button
+            type="button"
+            onClick={handleRefreshTitles}
+            disabled={isGeneratingTitles}
+            className="flex items-center gap-1 text-[11px] font-medium text-hh-yellow hover:text-hh-yellow-light disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            <span
+              className={`inline-block text-xs ${
+                isGeneratingTitles ? "animate-spin" : ""
+              }`}
+            >
+              🔄
+            </span>
+            <span>Refresh AI Titles</span>
+          </button>
+        </div>
+
+        {/* Selected Title Input Field (Allows custom typing too) */}
+        <input
+          id="title-input"
+          type="text"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="Select an AI title or type your own..."
+          maxLength={35}
+          className="
+            w-full px-3.5 py-2.5 rounded-xl
+            bg-hh-green-900/60 backdrop-blur-sm
+            border border-hh-pink/50
+            text-white placeholder:text-white/30
+            focus:outline-none focus:border-hh-pink focus:ring-1 focus:ring-hh-pink/60
+            transition-all duration-200
+            text-sm font-medium
+          "
+        />
+
+        {/* Candidate Title Chips Grid */}
+        {isGeneratingTitles ? (
+          <div className="flex items-center justify-center gap-2 py-3 bg-hh-green-900/40 rounded-xl border border-hh-green-700/50">
+            <div className="w-4 h-4 border-2 border-hh-pink border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-hh-pink/90 font-medium animate-pulse">
+              Generating stack-customized AI titles...
+            </span>
+          </div>
+        ) : suggestedTitles.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {suggestedTitles.map((t) => {
+              const isSelected =
+                title.trim().toLowerCase() === t.trim().toLowerCase();
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => onTitleChange(t)}
+                  className={`
+                    px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer
+                    ${
+                      isSelected
+                        ? "bg-hh-pink text-white font-semibold shadow-md ring-2 ring-hh-pink/50 scale-[1.02]"
+                        : "bg-hh-green-800/80 text-white/80 border border-hh-green-700 hover:border-hh-pink/40 hover:text-white hover:bg-hh-green-700/60"
+                    }
+                  `}
+                >
+                  {isSelected ? `✓ ${t}` : t}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ export type BadgeMode = "card" | "pfp";
 interface CanvasPreviewProps {
   name: string;
   stack: string;
+  title?: string;
   photoUrl: string | null;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   mode: BadgeMode;
@@ -44,6 +45,7 @@ const PFP_SIZE = 600;
 export default function CanvasPreview({
   name,
   stack,
+  title,
   photoUrl,
   canvasRef,
   mode = "card",
@@ -58,10 +60,10 @@ export default function CanvasPreview({
 
   // Load both templates on mount
   useEffect(() => {
-      Promise.all([
-        loadImage("/badge-template.png?v=2"),
-        loadImage("/pfp-template.png?v=2"),
-      ])
+    Promise.all([
+      loadImage("/badge-template.png?v=2"),
+      loadImage("/pfp-template.png?v=2"),
+    ])
       .then(([cardImg, pfpImg]) => {
         cardTemplateRef.current = cardImg;
         pfpTemplateRef.current = pfpImg;
@@ -72,7 +74,7 @@ export default function CanvasPreview({
       });
   }, []);
 
-  // Randomize title when stack input changes
+  // Randomize fallback title when stack input changes if no title passed
   useEffect(() => {
     if (stack && stack !== prevStackRef.current && stack.length > 1) {
       builderTitleRef.current = getRandomTitle();
@@ -224,7 +226,11 @@ export default function CanvasPreview({
 
       // Builder Title Pill
       if (stack && stack.trim().length > 0) {
-        const titleText = `BUILDER TITLE: ${builderTitleRef.current.toUpperCase()}`;
+        const activeTitle =
+          title && title.trim().length > 0
+            ? title.trim()
+            : builderTitleRef.current;
+        const titleText = `BUILDER TITLE: ${activeTitle.toUpperCase()}`;
         ctx.font = "bold 12px 'Inter', sans-serif";
         const metrics = ctx.measureText(titleText);
         const pillW = Math.min(metrics.width + 32, CARD_W - 70);
@@ -243,7 +249,6 @@ export default function CanvasPreview({
         ctx.textBaseline = "middle";
         ctx.fillText(titleText, TEXT_CENTER_X, TITLE_PILL_Y + pillH / 2, pillW - 16);
       }
-
     } else {
       // ═════════════════════════════════════════
       // MODE 2: CIRCULAR PFP AVATAR (600 x 600)
@@ -251,12 +256,12 @@ export default function CanvasPreview({
       canvas.width = PFP_SIZE;
       canvas.height = PFP_SIZE;
 
-      // Pure transparent canvas background (no wood box)
+      // Pure transparent canvas background
       ctx.clearRect(0, 0, PFP_SIZE, PFP_SIZE);
 
       const cx = PFP_SIZE / 2; // 300
-      const cy = 308;          // Center of PFP badge photo hole below emblem
-      const photoClipRadius = 275; // Clips photo to green ring outer edge so it covers entire frame without bleeding outside
+      const cy = 308;          // Center of PFP badge photo hole
+      const photoClipRadius = 275;
 
       // 1. Draw User Photo (Behind Frame)
       if (photoImgRef.current) {
@@ -295,7 +300,7 @@ export default function CanvasPreview({
         ctx.drawImage(pfpTemplateRef.current, 0, 0, PFP_SIZE, PFP_SIZE);
       }
     }
-  }, [name, stack, photoUrl, mode, transform, canvasRef]);
+  }, [name, stack, title, photoUrl, mode, transform, canvasRef]);
 
   // Load photo when URL changes
   useEffect(() => {
@@ -320,7 +325,7 @@ export default function CanvasPreview({
     if (isReady) {
       drawCanvas();
     }
-  }, [isReady, name, stack, mode, transform, drawCanvas]);
+  }, [isReady, name, stack, title, mode, transform, drawCanvas]);
 
   return (
     <div className="canvas-wrapper flex justify-center">

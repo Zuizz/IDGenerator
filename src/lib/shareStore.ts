@@ -43,6 +43,7 @@ export async function storeShareBadge(
   // 2. Attempt Vercel Blob if token is available
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
+      // @ts-ignore - optional Vercel Blob dynamic import
       const { put } = await import("@vercel/blob");
       await put(`badges/${id}.png`, buffer, {
         access: "public",

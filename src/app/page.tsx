@@ -9,6 +9,7 @@ import { PhotoTransform } from "@/lib/canvasUtils";
 export default function HomePage() {
   const [name, setName] = useState("");
   const [stack, setStack] = useState("");
+  const [title, setTitle] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [badgeMode, setBadgeMode] = useState<BadgeMode>("card");
   const [photoTransform, setPhotoTransform] = useState<PhotoTransform>({
@@ -63,14 +64,18 @@ export default function HomePage() {
             </h1>
 
             <p className="text-white/60 text-xs animate-fade-in-up stagger-2">
-              Upload your photo, enter your details, and generate your badge. Preview is available on desktop.
+              Upload your photo, enter your details, pick your AI builder title, and generate your badge.
             </p>
           </header>
 
           <section className="bg-hh-green-800/40 backdrop-blur-md p-4 rounded-2xl border border-hh-green-700/50 shadow-xl">
             <BadgeForm
+              name={name}
+              stack={stack}
+              title={title}
               onNameChange={setName}
               onStackChange={setStack}
+              onTitleChange={setTitle}
               onPhotoChange={setPhotoUrl}
               onTransformChange={setPhotoTransform}
             />
@@ -129,6 +134,7 @@ export default function HomePage() {
               <CanvasPreview
                 name={name}
                 stack={stack}
+                title={title}
                 photoUrl={photoUrl}
                 canvasRef={canvasRef}
                 mode={badgeMode}
@@ -155,6 +161,7 @@ export default function HomePage() {
               <CanvasPreview
                 name={name}
                 stack={stack}
+                title={title}
                 photoUrl={photoUrl}
                 canvasRef={canvasRef}
                 mode={badgeMode}
@@ -186,15 +193,19 @@ export default function HomePage() {
               </h1>
 
               <p className="text-white/60 text-xs sm:text-sm animate-fade-in-up stagger-2">
-                Upload your photo, enter your details, and instantly generate your official ID badge & PFP avatar.
+                Upload your photo, enter your details, pick your AI builder title, and instantly generate your badge.
               </p>
             </header>
 
             {/* Input Form */}
             <section className="bg-hh-green-800/40 backdrop-blur-md p-5 rounded-2xl border border-hh-green-700/50 shadow-xl">
               <BadgeForm
+                name={name}
+                stack={stack}
+                title={title}
                 onNameChange={setName}
                 onStackChange={setStack}
+                onTitleChange={setTitle}
                 onPhotoChange={setPhotoUrl}
                 onTransformChange={setPhotoTransform}
               />
@@ -255,6 +266,7 @@ export default function HomePage() {
               <CanvasPreview
                 name={name}
                 stack={stack}
+                title={title}
                 photoUrl={photoUrl}
                 canvasRef={canvasRef}
                 mode={badgeMode}
