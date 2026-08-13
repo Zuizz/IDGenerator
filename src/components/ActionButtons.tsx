@@ -34,13 +34,16 @@ export default function ActionButtons({
     setIsSharing(true);
     setShareError(null);
 
+    const CAPTION =
+      "Just got my Hacker House Goa 2026 Builder ID 🌴 #FrameInGoa";
+
     try {
       const dataUrl = canvas.toDataURL("image/png");
+
+      // 1. Upload badge to server to get a stable share URL.
       const response = await fetch("/api/shares", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataUrl }),
       });
 
@@ -56,18 +59,34 @@ export default function ActionButtons({
         (typeof window !== "undefined" ? window.location.origin : "");
       const sharePageUrl = `${siteUrl}/share/${id}`;
 
-      const caption = encodeURIComponent(
-        "Just got my Hacker House Goa 2026 Builder ID 🌴\n#FrameInGoa"
-      );
-      const xIntentUrl = `https://x.com/intent/tweet?text=${caption}&url=${encodeURIComponent(
-        sharePageUrl
-      )}`;
+      // 2. Also silently download the badge PNG so the user can attach it
+      //    manually inside X's composer with the image button (📷).
+      const link = document.createElement("a");
+      link.download = "hh-goa-2026-badge.png";
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-      window.open(xIntentUrl, "_blank", "noopener,noreferrer");
+      // 3. Open X compose window directly — pre-filled caption + link.
+      //    The link's OG image (set on the /share/[id] page) is the generated
+      //    badge, so when deployed the link card shows the actual graphic.
+      const tweetText = `${CAPTION}\n${sharePageUrl}`;
+      const xIntentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+
+      const popup = window.open(
+        xIntentUrl,
+        "share-to-x",
+        "width=600,height=600,noopener,noreferrer"
+      );
+      // Fallback if popups are blocked.
+      if (!popup) window.location.href = xIntentUrl;
     } catch (err) {
       console.error("Share failed:", err);
       setShareError(
-        "Failed to save badge locally. Check that the app can write to its cache folder."
+        err instanceof Error
+          ? err.message
+          : "Failed to share badge. Please try again."
       );
     } finally {
       setIsSharing(false);
