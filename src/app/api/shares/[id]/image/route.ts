@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
@@ -25,7 +26,7 @@ export async function GET(
   return new NextResponse(new Uint8Array(image), {
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
     },
   });
 }

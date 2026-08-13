@@ -2,10 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { readShareMetadata } from "@/lib/shareStore";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 function getBadgeImageUrl(id: string): string {
-  return `${SITE_URL}/api/shares/${id}/image`;
+  return `${SITE_URL}/api/shares/${id}/image?v=${id.slice(0, 8)}`;
 }
 
 function getSharePageUrl(id: string): string {
