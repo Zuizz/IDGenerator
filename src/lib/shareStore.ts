@@ -2,16 +2,26 @@
 import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
+import { createClient } from "@supabase/supabase-js";
 
 interface BadgeMetadata {
   name?: string;
   stack?: string;
   title?: string;
+  imageUrl?: string; // permanent Supabase public URL
 }
 
 const memoryCache = new Map<string, Buffer>();
 const metaCache = new Map<string, BadgeMetadata>();
 const SHARE_DIR = path.join(os.tmpdir(), "hh-goa-share-cache");
+const BUCKET = "badges";
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 function dataUrlToBuffer(dataUrl: string): Buffer {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
@@ -24,13 +34,13 @@ function dataUrlToBuffer(dataUrl: string): Buffer {
 
 export async function storeShareBadge(
   dataUrl: string,
-  meta?: BadgeMetadata
-): Promise<{ id: string; blobUrl?: string }> {
+  meta?: Omit<BadgeMetadata, "imageUrl">
+): Promise<{ id: string }> {
   const id = crypto.randomUUID();
   const buffer = dataUrlToBuffer(dataUrl);
 
+  // 1. Memory cache for same-request fast reads
   memoryCache.set(id, buffer);
-  if (meta) metaCache.set(id, meta);
 
   if (memoryCache.size > 200) {
     const firstKey = memoryCache.keys().next().value;
@@ -40,75 +50,75 @@ export async function storeShareBadge(
     }
   }
 
-  let blobUrl: string | undefined;
+  let imageUrl: string | undefined;
 
-  // PRIMARY: Vercel Blob (permanent, survives cold starts)
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  // 2. PRIMARY: Supabase Storage (permanent CDN URL)
+  const supabase = getSupabase();
+  if (supabase) {
     try {
-      const { put } = await import("@vercel/blob");
-      const imageResult = await put(`badges/${id}.png`, buffer, {
-        access: "public",
-        contentType: "image/png",
-      });
-      blobUrl = imageResult.url;
-      if (meta) {
-        await put(`badges/${id}.json`, JSON.stringify(meta), {
-          access: "public",
-          contentType: "application/json",
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(`${id}.png`, buffer, {
+          contentType: "image/png",
+          upsert: false,
         });
+
+      if (!error) {
+        const { data } = supabase.storage
+          .from(BUCKET)
+          .getPublicUrl(`${id}.png`);
+        imageUrl = data.publicUrl;
+      } else {
+        console.warn("Supabase upload error:", error.message);
       }
-    } catch (blobErr) {
-      console.warn("Vercel Blob store warning:", blobErr);
+    } catch (err) {
+      console.warn("Supabase storage error:", err);
     }
   }
 
-  // FALLBACK: Local /tmp (dev only, ephemeral on Vercel)
+  const fullMeta: BadgeMetadata = { ...meta, imageUrl };
+  metaCache.set(id, fullMeta);
+
+  // 3. FALLBACK: /tmp for local dev
   try {
     await mkdir(SHARE_DIR, { recursive: true });
     await writeFile(path.join(SHARE_DIR, `${id}.png`), buffer);
-    if (meta) {
-      await writeFile(path.join(SHARE_DIR, `${id}.json`), JSON.stringify(meta));
-    }
+    await writeFile(
+      path.join(SHARE_DIR, `${id}.json`),
+      JSON.stringify(fullMeta)
+    );
   } catch (fsErr) {
     console.warn("Temp FS write warning:", fsErr);
   }
 
-  return { id, blobUrl };
+  return { id };
 }
 
-export async function readShareMetadata(id: string): Promise<BadgeMetadata | null> {
+export async function readShareMetadata(
+  id: string
+): Promise<BadgeMetadata | null> {
+  // 1. Memory cache
   if (metaCache.has(id)) return metaCache.get(id)!;
 
+  // 2. Local /tmp (dev)
   try {
-    const content = await readFile(path.join(SHARE_DIR, `${id}.json`), "utf-8");
+    const content = await readFile(
+      path.join(SHARE_DIR, `${id}.json`),
+      "utf-8"
+    );
     const meta = JSON.parse(content) as BadgeMetadata;
     metaCache.set(id, meta);
     return meta;
   } catch { /* continue */ }
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    try {
-      const { list } = await import("@vercel/blob");
-      const { blobs } = await list({ prefix: `badges/${id}.json` });
-      if (blobs.length > 0) {
-        const res = await fetch(blobs[0].url);
-        if (res.ok) {
-          const meta = await res.json() as BadgeMetadata;
-          metaCache.set(id, meta);
-          return meta;
-        }
-      }
-    } catch (blobReadErr) {
-      console.warn("Vercel Blob meta read warning:", blobReadErr);
-    }
-  }
-
   return null;
 }
 
 export async function readShareBadge(id: string): Promise<Buffer | null> {
+  // 1. Memory cache
   if (memoryCache.has(id)) return memoryCache.get(id)!;
 
+  // 2. Local /tmp
   try {
     const filePath = path.join(SHARE_DIR, `${id}.png`);
     await access(filePath);
@@ -117,25 +127,34 @@ export async function readShareBadge(id: string): Promise<Buffer | null> {
     return buf;
   } catch { /* continue */ }
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  // 3. Supabase Storage
+  const supabase = getSupabase();
+  if (supabase) {
     try {
-      const { list } = await import("@vercel/blob");
-      const { blobs } = await list({ prefix: `badges/${id}.png` });
-      if (blobs.length > 0) {
-        const res = await fetch(blobs[0].url);
-        if (res.ok) {
-          const arrayBuffer = await res.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-          memoryCache.set(id, buffer);
-          return buffer;
-        }
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .download(`${id}.png`);
+      if (!error && data) {
+        const arrayBuffer = await data.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        memoryCache.set(id, buffer);
+        return buffer;
       }
-    } catch (blobReadErr) {
-      console.warn("Vercel Blob read warning:", blobReadErr);
+    } catch (err) {
+      console.warn("Supabase download error:", err);
     }
   }
 
   return null;
+}
+
+export function getPublicImageUrl(id: string): string | null {
+  const meta = metaCache.get(id);
+  if (meta?.imageUrl) return meta.imageUrl;
+
+  const url = process.env.SUPABASE_URL;
+  if (!url) return null;
+  return `${url}/storage/v1/object/public/${BUCKET}/${id}.png`;
 }
 
 export function getShareBadgeImageUrl(id: string, baseUrl: string): string {
