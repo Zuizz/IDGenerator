@@ -26,7 +26,7 @@ export default function ActionButtons({
     document.body.removeChild(link);
   };
 
-  const handleShareToX = () => {
+  const handleShareToX = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -35,7 +35,7 @@ export default function ActionButtons({
     try {
       const dataUrl = canvas.toDataURL("image/png");
 
-      // Step 1: Download badge immediately so user can attach it in X composer
+      // Step 1: Download badge so user has it ready to attach in X
       const link = document.createElement("a");
       link.download = "hh-goa-2026-badge.png";
       link.href = dataUrl;
@@ -43,23 +43,36 @@ export default function ActionButtons({
       link.click();
       document.body.removeChild(link);
 
-      // Step 2: Open X tweet composer immediately — no waiting on any API
-      const xIntentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(CAPTION)}`;
+      // Step 2: Upload to server to get the personalised share URL
+      let tweetText = CAPTION;
+      try {
+        const response = await fetch("/api/shares", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dataUrl }),
+        });
+        if (response.ok) {
+          const { id } = (await response.json()) as { id: string };
+          // Use NEXT_PUBLIC_SITE_URL on server, window.location.origin on client
+          const siteUrl =
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            window.location.origin;
+          const shareUrl = `${siteUrl}/share/${id}`;
+          // Append the personalised badge link — X renders it as a card preview
+          tweetText = `${CAPTION}\n${shareUrl}`;
+        }
+      } catch {
+        // Upload failed — still open X with caption only
+      }
+
+      // Step 3: Open X with caption + personalised badge link
+      const xIntentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
       const popup = window.open(
         xIntentUrl,
         "share-to-x",
         "width=600,height=600,noopener,noreferrer"
       );
       if (!popup) window.location.href = xIntentUrl;
-
-      // Step 3: Fire-and-forget upload to server in background (for share link)
-      // This NEVER blocks or errors out the share flow above.
-      fetch("/api/shares", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl }),
-      }).catch(() => {/* silently ignore */});
-
     } finally {
       setIsSharing(false);
     }
